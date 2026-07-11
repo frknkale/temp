@@ -27,9 +27,9 @@
       spec:
         project: default
         source:
-          repoURL: 'https://github.com/dummy/repo' # The user will push this to their repo, for local test we might just apply the directory directly.
+          repoURL: 'https://github.com/frknkale/dream'
           targetRevision: HEAD
-          path: argocd-apps
+          path: k8s/apps
         destination:
           server: 'https://kubernetes.default.svc'
           namespace: argocd
