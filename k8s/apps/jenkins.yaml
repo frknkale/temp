@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jenkins
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jenkins.io
+    targetRevision: 5.1.4
+    chart: jenkins
+    helm:
+      valuesObject:
+        controller:
+          nodeSelector:
+            dedicated: jenkins
+          serviceType: LoadBalancer
+          JCasC:
+            defaultConfig: true
+            configScripts:
+              welcome-message: |
+                jenkins:
+                  systemMessage: "Welcome to our GitOps managed Jenkins."
+        persistence:
+          enabled: true
+          size: 8Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: jenkins
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

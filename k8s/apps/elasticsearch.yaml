@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: elasticsearch
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.elastic.co
+    targetRevision: 8.5.1
+    chart: elasticsearch
+    helm:
+      valuesObject:
+        replicas: 1
+        minimumMasterNodes: 1
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: observability.local
+              paths:
+                - path: /elasticsearch
+        volumeClaimTemplate:
+          accessModes: [ "ReadWriteOnce" ]
+          storageClassName: "standard"
+          resources:
+            requests:
+              storage: 10Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

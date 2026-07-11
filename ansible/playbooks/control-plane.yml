@@ -1,0 +1,9 @@
+---
+- name: Initialize Kubernetes Control Plane
+  hosts: kube_master
+  become: true
+
+  roles:
+    - control-plane
+    - helm
+    - calico

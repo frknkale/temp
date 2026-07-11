@@ -1,0 +1,8 @@
+---
+- import_playbook: playbooks/prepare.yml
+- import_playbook: playbooks/containerd.yml
+- import_playbook: playbooks/kubernetes.yml
+- import_playbook: playbooks/control-plane.yml
+- import_playbook: playbooks/join-workers.yml
+- import_playbook: playbooks/metallb.yml
+- import_playbook: playbooks/argocd.yml

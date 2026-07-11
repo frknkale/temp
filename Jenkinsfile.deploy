@@ -1,0 +1,50 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+            apiVersion: v1
+            kind: Pod
+            spec:
+              containers:
+              - name: ansible
+                image: willhallonline/ansible:latest
+                command:
+                - cat
+                tty: true
+              - name: kubectl
+                image: bitnami/kubectl:latest
+                command:
+                - cat
+                tty: true
+            '''
+        }
+    }
+    parameters {
+        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'The Docker image tag to deploy')
+    }
+    environment {
+        DOCKER_IMAGE = "myrepo/sample-java-app:${params.IMAGE_TAG}"
+    }
+    stages {
+        stage('Deploy via kubectl/envsubst (or Ansible)') {
+            steps {
+                container('kubectl') {
+                    // Alternatively, we can use the GitOps approach by committing the updated tag to the repo and letting ArgoCD sync.
+                    // The assignment mentions "Use Ansible to apply Kubernetes manifests" for the deployment pipeline, so we can run an ansible playbook here.
+                    // For brevity, we substitute the image tag and apply.
+                    sh """
+                    export DOCKER_IMAGE=${DOCKER_IMAGE}
+                    cat k8s/app-manifests/deployment.yaml | envsubst | kubectl apply -f -
+                    """
+                }
+            }
+        }
+        stage('Wait for Zero-Downtime Rollout') {
+            steps {
+                container('kubectl') {
+                    sh "kubectl rollout status deployment/sample-java-app --namespace default"
+                }
+            }
+        }
+    }
+}

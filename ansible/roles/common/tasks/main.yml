@@ -1,0 +1,58 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 7200
+
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - vim
+      - git
+      - jq
+      - net-tools
+      - unzip
+    state: present
+
+- name: Disable swap immediately
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+
+- name: Disable swap in fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Configure kernel modules
+  ansible.builtin.template:
+    src: modules-k8s.conf.j2
+    dest: /etc/modules-load.d/k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Load kernel modules
+
+- name: Configure sysctl
+  ansible.builtin.template:
+    src: k8s.conf.j2
+    dest: /etc/sysctl.d/k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sysctl
+
+- name: Ensure overlay module is loaded
+  community.general.modprobe:
+    name: overlay
+    state: present
+
+- name: Ensure br_netfilter module is loaded
+  community.general.modprobe:
+    name: br_netfilter
+    state: present

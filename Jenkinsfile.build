@@ -1,0 +1,57 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+            apiVersion: v1
+            kind: Pod
+            spec:
+              containers:
+              - name: docker
+                image: docker:24.0.5-dind
+                securityContext:
+                  privileged: true
+                tty: true
+              - name: maven
+                image: maven:3.9.6-eclipse-temurin-21
+                command:
+                - cat
+                tty: true
+            '''
+        }
+    }
+    environment {
+        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
+        DOCKER_IMAGE = "myrepo/sample-java-app:${env.BUILD_NUMBER}"
+    }
+    stages {
+        stage('Build with Maven') {
+            steps {
+                container('maven') {
+                    dir('app') {
+                        sh 'mvn clean package -DskipTests'
+                    }
+                }
+            }
+        }
+        stage('Build & Push Docker Image') {
+            steps {
+                container('docker') {
+                    dir('app') {
+                        withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                            sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
+                            sh "docker build -t ${env.DOCKER_IMAGE} ."
+                            sh "docker push ${env.DOCKER_IMAGE}"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Trigger Deploy Pipeline') {
+            steps {
+                build job: 'deploy-pipeline', parameters: [
+                    string(name: 'IMAGE_TAG', value: env.BUILD_NUMBER)
+                ]
+            }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+kubernetes_version: "1.30.14"
+kubernetes_repo_version: "v1.30"
+
+cluster_name: dream-cluster
+node_network: 10.50.0.0/24
+pod_subnet: "192.168.0.0/16"
+service_subnet: "10.96.0.0/12"
+
+node_labels:
+  node-2:
+    dedicated: jenkins

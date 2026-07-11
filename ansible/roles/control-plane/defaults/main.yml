@@ -1,0 +1,2 @@
+control_plane_endpoint: "10.50.0.10"
+cri_socket: "unix:///run/containerd/containerd.sock"

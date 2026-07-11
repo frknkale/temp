@@ -1,0 +1,44 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pod-restart-alert
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+  - name: application.rules
+    rules:
+    - alert: PodRestarts
+      expr: changes(kube_pod_container_status_restarts_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} restarted"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted in the last 5 minutes."
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-app-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  app-dashboard.json: |-
+    {
+      "title": "Custom Application Dashboard",
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Pod Restarts",
+          "targets": [
+            {
+              "expr": "sum(kube_pod_container_status_restarts_total) by (pod)",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,67 @@
+---
+- name: Create directory for APT keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types:
+      - deb
+    uris:
+      - https://download.docker.com/linux/ubuntu
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+    components:
+      - stable
+    architectures:
+      - "{{ containerd_architecture }}"
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install containerd
+  ansible.builtin.apt:
+    name: containerd.io
+    state: present
+
+- name: Create containerd configuration directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+
+- name: Check whether containerd config already exists
+  ansible.builtin.stat:
+    path: "{{ containerd_config_path }}"
+  register: containerd_config
+
+- name: Check if CRI plugin is disabled
+  ansible.builtin.shell: |
+    grep -q 'disabled_plugins *=.*"cri"' {{ containerd_config_path }}
+  register: cri_disabled
+  changed_when: false
+  failed_when: false
+
+- name: Generate default containerd configuration
+  ansible.builtin.shell: |
+    containerd config default > {{ containerd_config_path }}
+  when: not containerd_config.stat.exists or cri_disabled.rc == 0
+
+- name: Enable SystemdCgroup
+  ansible.builtin.replace:
+    path: "{{ containerd_config_path }}"
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+  notify: Restart containerd

@@ -1,0 +1,49 @@
+---
+- name: Add MetalLB Helm repository
+  kubernetes.core.helm_repository:
+    name: metallb
+    repo_url: https://metallb.github.io/metallb
+
+- name: Install MetalLB via Helm
+  kubernetes.core.helm:
+    name: metallb
+    chart_ref: metallb/metallb
+    release_namespace: metallb-system
+    create_namespace: yes
+    kubeconfig: /etc/kubernetes/admin.conf
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Wait for MetalLB controller to be ready
+  ansible.builtin.command: >
+    kubectl wait --namespace metallb-system 
+    --for=condition=ready pod 
+    --selector=app.kubernetes.io/component=controller 
+    --timeout=90s
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Create MetalLB IPAddressPool
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: first-pool
+        namespace: metallb-system
+      spec:
+        addresses:
+        - 10.50.0.100-10.50.0.150
+
+- name: Create MetalLB L2Advertisement
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: example
+        namespace: metallb-system

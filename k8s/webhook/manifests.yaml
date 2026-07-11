@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-validator
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: resource-validator
+  template:
+    metadata:
+      labels:
+        app: resource-validator
+    spec:
+      containers:
+      - name: validator
+        image: myrepo/resource-validator:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /etc/webhook/certs
+          readOnly: true
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: webhook-server-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: resource-validator-svc
+  namespace: default
+spec:
+  ports:
+  - port: 443
+    targetPort: 8443
+  selector:
+    app: resource-validator
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validate-resource-requests
+webhooks:
+  - name: validate-resource-requests.example.com
+    clientConfig:
+      service:
+        name: resource-validator-svc
+        namespace: default
+        path: "/validate"
+      # caBundle is typically populated via a tool like cert-manager or a shell script
+      caBundle: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==" # Placeholder Base64 CA Cert
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    admissionReviewVersions: ["v1"]
+    sideEffects: None

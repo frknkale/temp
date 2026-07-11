@@ -1,0 +1,7 @@
+docker_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+
+containerd_architecture: "{{ docker_arch_map[ansible_facts['architecture']] }}"
+
+containerd_config_path: /etc/containerd/config.toml

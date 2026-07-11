@@ -1,0 +1,29 @@
+---
+- name: Generate kubeadm configuration
+  template:
+    src: kubeadm-config.yaml.j2
+    dest: /root/kubeadm-config.yaml
+    mode: "0600"
+
+- name: Check if cluster already exists
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: cluster
+
+- name: Initialize Kubernetes cluster
+  command:
+    cmd: kubeadm init --config /root/kubeadm-config.yaml
+  when: not cluster.stat.exists
+
+- name: Create .kube directory
+  file:
+    path: /root/.kube
+    state: directory
+    mode: "0700"
+
+- name: Copy kubeconfig
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: "0600"

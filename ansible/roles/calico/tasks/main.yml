@@ -1,0 +1,31 @@
+- name: Install Python Kubernetes client
+  ansible.builtin.apt:
+    name: python3-kubernetes
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Add Calico Helm repository
+  kubernetes.core.helm_repository:
+    name: projectcalico
+    repo_url: https://docs.tigera.io/calico/charts
+
+- name: Deploy Calico
+  kubernetes.core.helm:
+    name: calico
+    chart_ref: projectcalico/tigera-operator
+    chart_version: "{{ calico_version }}"
+    release_namespace: tigera-operator
+    create_namespace: true
+    update_repo_cache: true
+    values:
+      installation:
+        calicoNetwork:
+          nodeAddressAutodetectionV4:
+            cidrs:
+              - "{{ node_network }}"
+          ipPools:
+            - cidr: "{{ pod_subnet }}"
+              encapsulation: VXLAN
+              natOutgoing: Enabled
+              nodeSelector: all()
