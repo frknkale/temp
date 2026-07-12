@@ -1,0 +1,29 @@
+- name: Install local-path-provisioner
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    src: https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+
+- name: Wait for local-path-provisioner deployment
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/kubernetes/admin.conf
+    api_version: apps/v1
+    kind: Deployment
+    namespace: local-path-storage
+    name: local-path-provisioner
+    wait: true
+    wait_condition:
+      type: Available
+      status: "True"
+    wait_timeout: 120
+
+- name: Set local-path as the default StorageClass
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: local-path
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"

@@ -5,4 +5,5 @@
 - import_playbook: playbooks/control-plane.yml
 - import_playbook: playbooks/join-workers.yml
 - import_playbook: playbooks/metallb.yml
+- import_playbook: playbooks/storage.yml
 - import_playbook: playbooks/argocd.yml

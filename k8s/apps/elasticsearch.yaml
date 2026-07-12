@@ -24,7 +24,7 @@ spec:
                 - path: /elasticsearch
         volumeClaimTemplate:
           accessModes: [ "ReadWriteOnce" ]
-          storageClassName: "standard"
+          storageClassName: "local-path"
           resources:
             requests:
               storage: 10Gi

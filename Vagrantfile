@@ -3,6 +3,7 @@ MASTER_MEMORY = ENV["MASTER_CPUS"] || 4096
 MASTER_CPUS = ENV["MASTER_CPUS"] || 2
 WORKER_NODES = ENV["WORKER_NODES"] || 2
 WORKER_MEMORY = ENV["WORKER_MEMORY"] || 2048
+DISK_SIZE = ENV["DISK_SIZE"] || 20
 WORKER_CPUS = ENV["WORKER_CPUS"] || 2
 BASE_IP = ENV["BASE_IP"] || "10.50.0"
 
@@ -20,6 +21,7 @@ Vagrant.configure("2") do |config|
         v.memory = MASTER_MEMORY
         v.cpus = MASTER_CPUS
       end
+      master.disksize.size = "#{DISK_SIZE}GB"
       master.vm.box = IMAGE_NAME
       master.vm.network "private_network", ip: "#{BASE_IP}.#{10}"
       master.vm.hostname = "k8s-master"
@@ -31,6 +33,7 @@ Vagrant.configure("2") do |config|
             v.memory = WORKER_MEMORY
             v.cpus = WORKER_CPUS
           end
+          node.disksize.size = "#{DISK_SIZE}GB"
           node.vm.box = IMAGE_NAME
           node.vm.network "private_network", ip: "#{BASE_IP}.#{i + 10}"
           node.vm.hostname = "node-#{i}"
