@@ -1,0 +1,26 @@
+- name: Wait for CoreDNS ConfigMap
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/kubernetes/admin.conf
+    api_version: v1
+    kind: ConfigMap
+    namespace: kube-system
+    name: coredns
+  register: coredns_cm
+  retries: 30
+  delay: 10
+  until: (coredns_cm.resources | default([])) | length > 0
+
+- name: Check CoreDNS upstream
+  ansible.builtin.shell: |
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get configmap coredns -o jsonpath='{.data.Corefile}'
+  register: coredns_corefile
+  changed_when: false
+
+- name: Patch CoreDNS upstream DNS
+  ansible.builtin.shell: |
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get configmap coredns -o yaml \
+    | sed -E 's#forward[[:space:]]+\.[[:space:]]+/etc/resolv\.conf#forward . 8.8.8.8 1.1.1.1#' \
+    | kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f -
+  when: coredns_corefile.stdout is search('forward\\s+\\.\\s+/etc/resolv\\.conf')
+  notify:
+    - Restart CoreDNS

@@ -19,7 +19,7 @@
     kubectl wait --namespace metallb-system 
     --for=condition=ready pod 
     --selector=app.kubernetes.io/component=controller 
-    --timeout=90s
+    --timeout=180s
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
 
