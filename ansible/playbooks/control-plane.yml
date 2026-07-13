@@ -8,3 +8,4 @@
     - helm
     - calico
     - coredns
+    - sealed-secrets

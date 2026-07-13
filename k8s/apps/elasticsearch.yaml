@@ -16,6 +16,13 @@ spec:
         replicas: 1
         minimumMasterNodes: 1
 
+        extraEnvs:
+          - name: ELASTIC_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: elasticsearch-credentials
+                key: admin-password
+
         esJavaOpts: "-Xms512m -Xmx512m"
         resources:
           requests:
