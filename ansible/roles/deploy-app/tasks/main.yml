@@ -4,14 +4,14 @@
 
 - name: Template and apply deployment manifest
   kubernetes.core.k8s:
-    kubeconfig: "{{ kubeconfig_path | default('/etc/kubernetes/admin.conf') }}"
+    kubeconfig: "{{ kubeconfig_path | default('/root/.kube/config') }}"
     state: present
     template: deployment.yaml.j2
 
 - name: Wait for rollout to complete (zero-downtime)
   ansible.builtin.command:
     cmd: >
-      kubectl --kubeconfig={{ kubeconfig_path | default('/etc/kubernetes/admin.conf') }}
+      kubectl --kubeconfig={{ kubeconfig_path | default('/root/.kube/config') }}
       rollout status deployment/sample-java-app
       --namespace default --timeout=300s
   changed_when: false
