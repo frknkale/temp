@@ -34,6 +34,7 @@ pipeline {
             steps {
                 container('ansible') {
                     sh """
+                    export ANSIBLE_CONFIG=ansible/ansible.cfg
                     ansible-playbook ansible/playbooks/deploy-app.yml \
                       -i ansible/inventory/hosts.ini \
                       -e 'app_image=${DOCKER_IMAGE}' \
