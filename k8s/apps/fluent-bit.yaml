@@ -54,7 +54,8 @@ spec:
                 Replace_Dots    On
                 Retry_Limit     5
                 Suppress_Type_Name On
-                tls             Off
+                tls             On
+                tls.verify      Off
   destination:
     server: https://kubernetes.default.svc
     namespace: logging
