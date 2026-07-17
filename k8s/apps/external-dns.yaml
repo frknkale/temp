@@ -16,12 +16,14 @@ spec:
         provider: coredns
         env:
           - name: ETCD_URLS
-            value: http://10.50.0.10:2379 # Assuming etcd on master node
-        txtOwnerId: my-cluster-id
+            # Points to the dedicated etcd, NOT the Kubernetes etcd
+            value: http://etcd-dns.external-dns.svc.cluster.local:2379
+        txtOwnerId: dream-cluster
         policy: sync
         sources:
           - service
           - ingress
+        logLevel: info
   destination:
     server: https://kubernetes.default.svc
     namespace: external-dns

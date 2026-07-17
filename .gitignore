@@ -1,3 +1,6 @@
 .vagrant/
+.ansible/
 .DS_Store
 k8s/raw-secrets/
+ansible/vault/
+*.retry

@@ -10,17 +10,65 @@
   delay: 10
   until: (coredns_cm.resources | default([])) | length > 0
 
-- name: Check CoreDNS upstream
+- name: Get current CoreDNS Corefile
   ansible.builtin.shell: |
     kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get configmap coredns -o jsonpath='{.data.Corefile}'
   register: coredns_corefile
   changed_when: false
 
-- name: Patch CoreDNS upstream DNS
+- name: Patch CoreDNS with upstream DNS and etcd plugin for ExternalDNS
   ansible.builtin.shell: |
     kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get configmap coredns -o yaml \
     | sed -E 's#forward[[:space:]]+\.[[:space:]]+/etc/resolv\.conf#forward . 8.8.8.8 1.1.1.1#' \
     | kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f -
-  when: coredns_corefile.stdout is search('forward\\s+\\.\\s+/etc/resolv\\.conf')
+  when: coredns_corefile.stdout is search('forward\s+\.\s+/etc/resolv\.conf')
+  notify:
+    - Restart CoreDNS
+
+# Add the etcd plugin zone so CoreDNS can serve records written by ExternalDNS
+- name: Check if etcd zone already exists in Corefile
+  ansible.builtin.shell: |
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get configmap coredns \
+      -o jsonpath='{.data.Corefile}'
+  register: current_corefile
+  changed_when: false
+
+- name: Patch CoreDNS ConfigMap with etcd zone for ExternalDNS
+  kubernetes.core.k8s:
+    kubeconfig: /etc/kubernetes/admin.conf
+    state: present
+    merge_type: strategic-merge
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: coredns
+        namespace: kube-system
+      data:
+        Corefile: |
+          .:53 {
+              errors
+              health {
+                 lameduck 5s
+              }
+              ready
+              kubernetes cluster.local in-addr.arpa ip6.arpa {
+                 pods insecure
+                 fallthrough in-addr.arpa ip6.arpa
+                 ttl 30
+              }
+              etcd local {
+                 path /skydns
+                 endpoint http://etcd-dns.external-dns.svc.cluster.local:2379
+                 fallthrough
+              }
+              prometheus :9153
+              forward . 8.8.8.8 1.1.1.1
+              cache 30
+              loop
+              reload
+              loadbalance
+          }
+  when: current_corefile.stdout is not search('etcd local')
   notify:
     - Restart CoreDNS

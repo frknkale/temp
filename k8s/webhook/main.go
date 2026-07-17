@@ -3,17 +3,21 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// validateResources validates that all containers in a Deployment's pod spec
+// have CPU and memory resource requests defined.
+// Assignment Step 2.4: "Write a custom validation webhook that fails if a
+// deployment does not specify required CPU and memory resource requests."
 func validateResources(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "could not read request body", http.StatusBadRequest)
 		return
@@ -26,20 +30,29 @@ func validateResources(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := admissionReviewReq.Request
-	var pod corev1.Pod
-	if err := json.Unmarshal(req.Object.Raw, &pod); err != nil {
-		log.Printf("could not unmarshal pod: %v", err)
-		http.Error(w, "could not unmarshal pod", http.StatusBadRequest)
+
+	// Unmarshal the Deployment object
+	var deployment appsv1.Deployment
+	if err := json.Unmarshal(req.Object.Raw, &deployment); err != nil {
+		log.Printf("could not unmarshal deployment: %v", err)
+		http.Error(w, "could not unmarshal deployment", http.StatusBadRequest)
 		return
 	}
 
 	allowed := true
-	message := "All containers have resource requests specified."
+	message := "All containers have CPU and memory resource requests specified."
 
-	for _, container := range pod.Spec.Containers {
-		if container.Resources.Requests.Cpu().IsZero() || container.Resources.Requests.Memory().IsZero() {
+	// Check each container in the pod template spec
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		cpuReq := container.Resources.Requests.Cpu()
+		memReq := container.Resources.Requests.Memory()
+
+		if cpuReq == nil || cpuReq.IsZero() || memReq == nil || memReq.IsZero() {
 			allowed = false
-			message = fmt.Sprintf("Container %s is missing CPU or Memory requests", container.Name)
+			message = fmt.Sprintf(
+				"Deployment '%s': container '%s' is missing required CPU or Memory resource requests",
+				deployment.Name, container.Name,
+			)
 			break
 		}
 	}
@@ -74,7 +87,7 @@ func main() {
 	http.HandleFunc("/validate", validateResources)
 
 	log.Println("Starting validation webhook server on port 8443...")
-	// The TLS certificate paths are hardcoded and injected via Kubernetes secrets
+	// TLS certificates are injected via cert-manager and mounted as a Kubernetes secret
 	err := http.ListenAndServeTLS(":8443", "/etc/webhook/certs/tls.crt", "/etc/webhook/certs/tls.key", nil)
 	if err != nil {
 		log.Fatalf("Server failed: %v", err)

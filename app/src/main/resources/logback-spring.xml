@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ================================================================== -->
+    <!-- Step 1.7: Asynchronous File Logging                                -->
+    <!-- Writes logs to a file asynchronously instead of stdout to          -->
+    <!-- eliminate the performance impact of blocking I/O.                  -->
+    <!-- ================================================================== -->
+
+    <!-- File Appender with rolling policy -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/var/log/app/application.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+
+        <!-- Combined time-based + size-based rotation (Step 1.7.b + 1.7.c) -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Daily rollover with a sequence number for size-based splits -->
+            <fileNamePattern>/var/log/app/application-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+
+            <!-- Each file must not exceed 1GB (Step 1.7.b) -->
+            <maxFileSize>1GB</maxFileSize>
+
+            <!-- Rotate daily, keep 30 days of history (Step 1.7.c) -->
+            <maxHistory>30</maxHistory>
+
+            <!-- Cap total log storage at 10GB -->
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Async wrapper for non-blocking log writes (Step 1.7.a) -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <!-- Console appender (kept for local development / container log aggregation) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root logger configuration -->
+    <root level="INFO">
+        <!-- Production: async file logging -->
+        <appender-ref ref="ASYNC_FILE" />
+        <!-- Keep console for container environments where stdout is desired -->
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+</configuration>

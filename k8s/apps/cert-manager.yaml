@@ -1,19 +1,25 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: secrets
+  name: cert-manager
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/frknkale/temp
-    targetRevision: HEAD
-    path: k8s/sealed-secrets
+    repoURL: https://charts.jetstack.io
+    targetRevision: v1.13.2
+    chart: cert-manager
+    helm:
+      valuesObject:
+        installCRDs: true
   destination:
     server: https://kubernetes.default.svc
+    namespace: cert-manager
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

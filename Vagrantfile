@@ -1,8 +1,8 @@
-IMAGE_NAME = ENV["IMAGE_NAME"] || "cloud-image/ubuntu-22.04"
+IMAGE_NAME = ENV["IMAGE_NAME"] || "bento/ubuntu-24.04"
 MASTER_MEMORY = ENV["MASTER_CPUS"] || 4096
 MASTER_CPUS = ENV["MASTER_CPUS"] || 2
 WORKER_NODES = ENV["WORKER_NODES"] || 2
-WORKER_MEMORY = ENV["WORKER_MEMORY"] || 2048
+WORKER_MEMORY = ENV["WORKER_MEMORY"] || 5120
 DISK_SIZE = ENV["DISK_SIZE"] || 20
 WORKER_CPUS = ENV["WORKER_CPUS"] || 2
 BASE_IP = ENV["BASE_IP"] || "10.50.0"
@@ -17,7 +17,7 @@ Vagrant.configure("2") do |config|
   SHELL
 
   config.vm.define "k8s-master" do |master|
-      master.vm.provider "virtualbox" do |v|
+      master.vm.provider "vmware_desktop" do |v|
         v.memory = MASTER_MEMORY
         v.cpus = MASTER_CPUS
       end
@@ -29,7 +29,7 @@ Vagrant.configure("2") do |config|
 
   (1..WORKER_NODES).each do |i|
       config.vm.define "node-#{i}" do |node|
-          node.vm.provider "virtualbox" do |v|
+          node.vm.provider "vmware_desktop" do |v|
             v.memory = WORKER_MEMORY
             v.cpus = WORKER_CPUS
           end

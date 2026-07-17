@@ -1,0 +1,70 @@
+# Dedicated etcd instance for ExternalDNS
+# Kubernetes' own etcd is TLS-protected and not suitable for ExternalDNS.
+# This standalone etcd stores DNS records that CoreDNS reads via its etcd plugin.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd-dns
+  namespace: external-dns
+  labels:
+    app: etcd-dns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd-dns
+  template:
+    metadata:
+      labels:
+        app: etcd-dns
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.5.12
+        command:
+        - etcd
+        - --listen-client-urls=http://0.0.0.0:2379
+        - --advertise-client-urls=http://etcd-dns.external-dns.svc.cluster.local:2379
+        - --data-dir=/var/lib/etcd
+        ports:
+        - containerPort: 2379
+          name: client
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        volumeMounts:
+        - name: etcd-data
+          mountPath: /var/lib/etcd
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 2379
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 2379
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: etcd-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-dns
+  namespace: external-dns
+spec:
+  selector:
+    app: etcd-dns
+  ports:
+  - port: 2379
+    targetPort: 2379
+    name: client

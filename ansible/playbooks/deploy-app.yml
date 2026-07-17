@@ -1,0 +1,10 @@
+---
+- name: Deploy Application to Kubernetes
+  hosts: kube_master
+  become: true
+
+  roles:
+    - role: deploy-app
+      vars:
+        docker_image: "{{ app_image | default('crastle/sample-java-app:latest') }}"
+        app_replicas: 4

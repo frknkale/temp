@@ -21,14 +21,14 @@ pipeline {
     }
     environment {
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
-        DOCKER_IMAGE = "myrepo/sample-java-app:${env.BUILD_NUMBER}"
+        DOCKER_IMAGE = "crastle/sample-java-app:${env.BUILD_NUMBER}"
     }
     stages {
         stage('Build with Maven') {
             steps {
                 container('maven') {
                     dir('app') {
-                        sh 'mvn clean package -DskipTests'
+                        sh 'mvn clean package -DskipTests -B'
                     }
                 }
             }
@@ -40,7 +40,9 @@ pipeline {
                         withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
                             sh 'echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin'
                             sh "docker build -t ${env.DOCKER_IMAGE} ."
+                            sh "docker tag ${env.DOCKER_IMAGE} crastle/sample-java-app:latest"
                             sh "docker push ${env.DOCKER_IMAGE}"
+                            sh "docker push crastle/sample-java-app:latest"
                         }
                     }
                 }
@@ -51,6 +53,13 @@ pipeline {
                 build job: 'deploy-pipeline', parameters: [
                     string(name: 'IMAGE_TAG', value: env.BUILD_NUMBER)
                 ]
+            }
+        }
+    }
+    post {
+        always {
+            container('docker') {
+                sh 'docker logout || true'
             }
         }
     }

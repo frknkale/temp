@@ -1,0 +1,4 @@
+---
+docker_image: "crastle/sample-java-app:latest"
+app_replicas: 4
+kubeconfig_path: "/etc/kubernetes/admin.conf"

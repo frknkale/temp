@@ -17,6 +17,7 @@
       - jq
       - net-tools
       - unzip
+      - python3-debian
     state: present
 
 - name: Disable swap immediately

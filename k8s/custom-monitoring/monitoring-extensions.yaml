@@ -1,3 +1,7 @@
+# ===========================================================================
+# PrometheusRule: Pod Restart Alert (Step 1.6.b)
+# Triggers when any pod restarts within a 5-minute window.
+# ===========================================================================
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -10,35 +14,297 @@ spec:
   - name: application.rules
     rules:
     - alert: PodRestarts
-      expr: changes(kube_pod_container_status_restarts_total[5m]) > 0
+      expr: increase(kube_pod_container_status_restarts_total[5m]) > 0
       for: 1m
       labels:
         severity: warning
       annotations:
         summary: "Pod {{ $labels.pod }} restarted"
-        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted in the last 5 minutes."
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} time(s) in the last 5 minutes."
+
+    - alert: PodCrashLooping
+      expr: increase(kube_pod_container_status_restarts_total[1h]) > 3
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod {{ $labels.pod }} is crash looping"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last hour."
 ---
+# ===========================================================================
+# Custom Grafana Dashboard: Kubernetes Cluster Overview (Step 1.6.a)
+# ===========================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: custom-app-dashboard
+  name: kubernetes-cluster-dashboard
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
 data:
-  app-dashboard.json: |-
+  kubernetes-cluster.json: |-
     {
-      "title": "Custom Application Dashboard",
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "schemaVersion": 39,
+      "tags": ["kubernetes", "cluster"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Kubernetes Cluster Overview",
+      "uid": "k8s-cluster-overview",
       "panels": [
         {
-          "type": "timeseries",
-          "title": "Pod Restarts",
+          "id": 1,
+          "title": "Total Running Pods",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
           "targets": [
             {
-              "expr": "sum(kube_pod_container_status_restarts_total) by (pod)",
-              "legendFormat": "{{pod}}"
+              "expr": "sum(kube_pod_status_phase{phase=\"Running\"})",
+              "legendFormat": "Running Pods"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "red", "value": 100 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Node Count",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [
+            {
+              "expr": "count(kube_node_info)",
+              "legendFormat": "Nodes"
             }
           ]
+        },
+        {
+          "id": 3,
+          "title": "Cluster CPU Usage",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) / sum(machine_cpu_cores) * 100",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 4,
+          "title": "Cluster Memory Usage",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "targets": [
+            {
+              "expr": "(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "CPU Usage by Node",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "targets": [
+            {
+              "expr": "sum by (instance) (rate(node_cpu_seconds_total{mode!=\"idle\"}[5m]))",
+              "legendFormat": "{{ instance }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Memory Usage by Node",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "targets": [
+            {
+              "expr": "sum by (instance) (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)",
+              "legendFormat": "{{ instance }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
+        },
+        {
+          "id": 7,
+          "title": "Pod Restarts (All Namespaces)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "targets": [
+            {
+              "expr": "sum by (pod, namespace) (increase(kube_pod_container_status_restarts_total[5m])) > 0",
+              "legendFormat": "{{ namespace }}/{{ pod }}"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Pods by Status",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "targets": [
+            {
+              "expr": "sum by (phase) (kube_pod_status_phase)",
+              "legendFormat": "{{ phase }}"
+            }
+          ]
+        }
+      ]
+    }
+---
+# ===========================================================================
+# Custom Grafana Dashboard: Application Metrics (Step 1.6.a)
+# ===========================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: application-metrics-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  application-metrics.json: |-
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "schemaVersion": 39,
+      "tags": ["application", "java"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Sample Java App Metrics",
+      "uid": "java-app-metrics",
+      "panels": [
+        {
+          "id": 1,
+          "title": "HTTP Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{job=\"sample-java-app\"}[5m])) by (uri, method, status)",
+              "legendFormat": "{{ method }} {{ uri }} [{{ status }}]"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps" }
+          }
+        },
+        {
+          "id": 2,
+          "title": "HTTP Request Duration (p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"sample-java-app\"}[5m])) by (le, uri))",
+              "legendFormat": "p99 {{ uri }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 3,
+          "title": "JVM Heap Memory Used",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (jvm_memory_used_bytes{area=\"heap\", job=\"sample-java-app\"})",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
+        },
+        {
+          "id": 4,
+          "title": "Application Pod Restarts",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (kube_pod_container_status_restarts_total{pod=~\"sample-java-app.*\"})",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Pod CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{pod=~\"sample-java-app.*\", container!=\"\"}[5m]))",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Pod Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{pod=~\"sample-java-app.*\", container!=\"\"})",
+              "legendFormat": "{{ pod }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes" }
+          }
         }
       ]
     }

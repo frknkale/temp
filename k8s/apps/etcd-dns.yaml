@@ -1,19 +1,22 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: secrets
+  name: etcd-dns
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/frknkale/temp
+    repoURL: 'https://github.com/frknkale/temp'
     targetRevision: HEAD
-    path: k8s/sealed-secrets
+    path: k8s/etcd-dns
   destination:
     server: https://kubernetes.default.svc
+    namespace: external-dns
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

@@ -1,3 +1,26 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: webhook-selfsigned-issuer
+  namespace: default
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: webhook-server-tls
+  namespace: default
+spec:
+  dnsNames:
+    - resource-validator-svc.default.svc
+    - resource-validator-svc.default.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: webhook-selfsigned-issuer
+  secretName: webhook-server-tls
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,10 +38,17 @@ spec:
     spec:
       containers:
       - name: validator
-        image: myrepo/resource-validator:latest
+        image: crastle/resource-validator:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
         volumeMounts:
         - name: webhook-certs
           mountPath: /etc/webhook/certs
@@ -40,10 +70,13 @@ spec:
   selector:
     app: resource-validator
 ---
+# Step 2.4: Validate Deployments for required resource requests
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: validate-resource-requests
+  annotations:
+    cert-manager.io/inject-ca-from: default/webhook-server-tls
 webhooks:
   - name: validate-resource-requests.example.com
     clientConfig:
@@ -51,12 +84,16 @@ webhooks:
         name: resource-validator-svc
         namespace: default
         path: "/validate"
-      # caBundle is typically populated via a tool like cert-manager or a shell script
-      caBundle: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==" # Placeholder Base64 CA Cert
     rules:
       - operations: ["CREATE", "UPDATE"]
-        apiGroups: [""]
+        apiGroups: ["apps"]
         apiVersions: ["v1"]
-        resources: ["pods"]
+        resources: ["deployments"]
     admissionReviewVersions: ["v1"]
     sideEffects: None
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values: ["kube-system", "argocd", "monitoring", "logging", "jenkins"]

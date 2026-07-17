@@ -1,5 +1,6 @@
 ---
-- hosts: kube_master
-  become: yes
+- name: Deploy ArgoCD
+  hosts: kube_master
+  become: true
   roles:
     - argocd

@@ -6,8 +6,7 @@ metadata:
   labels:
     app: java-app
 spec:
-  replicas: 4
-  # Step 2.3.c: Zero-downtime deployment strategy
+  replicas: {{ app_replicas | default(4) }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +21,6 @@ spec:
         app: java-app
     spec:
       terminationGracePeriodSeconds: 30
-      # Step 2.1.a: Ensure pods are evenly distributed across worker nodes
       topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
@@ -32,7 +30,7 @@ spec:
             app: java-app
       containers:
       - name: app
-        image: ${DOCKER_IMAGE}
+        image: {{ docker_image }}
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -43,21 +41,18 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
-        # Step 2.1.b: App receives requests only when ready
         readinessProbe:
           httpGet:
             path: /actuator/health/readiness
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 5
-        # Step 2.1.b: Auto-restart if issues arise
         livenessProbe:
           httpGet:
             path: /actuator/health/liveness
             port: 8080
           initialDelaySeconds: 20
           periodSeconds: 15
-        # Mount for async file logging (Step 1.7)
         volumeMounts:
         - name: log-volume
           mountPath: /var/log/app
@@ -72,7 +67,6 @@ metadata:
   name: sample-java-app
   namespace: default
   annotations:
-    # ExternalDNS will create a DNS record for this service
     external-dns.alpha.kubernetes.io/hostname: myapp.local
 spec:
   selector:
@@ -81,7 +75,6 @@ spec:
   - port: 80
     targetPort: 8080
 ---
-# Step 2.3.b: Application accessible via its hostname using an Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

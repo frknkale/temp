@@ -1,0 +1,47 @@
+---
+- name: Add Bitnami Helm repository
+  kubernetes.core.helm_repository:
+    name: bitnami
+    repo_url: https://charts.bitnami.com/bitnami
+
+- name: Check if backup key exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/../vault/sealed-secrets-key.yaml"
+  delegate_to: localhost
+  become: false
+  register: key_backup
+
+- name: Copy controller key
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../vault/sealed-secrets-key.yaml"
+    dest: /tmp/sealed-secrets-key.yaml
+    mode: "0600"
+  when: key_backup.stat.exists
+
+- name: Restore controller key
+  kubernetes.core.k8s:
+    state: present
+    src: /tmp/sealed-secrets-key.yaml
+  when: key_backup.stat.exists
+
+- name: Install Sealed Secrets
+  kubernetes.core.helm:
+    name: sealed-secrets
+    chart_ref: bitnami/sealed-secrets
+    release_namespace: kube-system
+    create_namespace: true
+    wait: true
+
+- name: Remove controller key
+  ansible.builtin.file:
+    path: /tmp/sealed-secrets-key.yaml
+    state: absent
+  when: key_backup.stat.exists
+
+# - name: Restart controller
+#   command: kubectl rollout restart deployment sealed-secrets -n kube-system
+#   when: restore_key.changed
+
+# - name: Wait for controller
+#   command: kubectl rollout status deployment sealed-secrets -n kube-system --timeout=180s
+#   when: restore_key.changed

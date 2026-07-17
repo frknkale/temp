@@ -11,11 +11,14 @@ pipeline {
                 command:
                 - cat
                 tty: true
-              - name: kubectl
-                image: bitnami/kubectl:latest
-                command:
-                - cat
-                tty: true
+                volumeMounts:
+                - name: kubeconfig
+                  mountPath: /root/.kube
+                  readOnly: true
+              volumes:
+              - name: kubeconfig
+                secret:
+                  secretName: kubeconfig-secret
             '''
         }
     }
@@ -23,26 +26,29 @@ pipeline {
         string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'The Docker image tag to deploy')
     }
     environment {
-        DOCKER_IMAGE = "myrepo/sample-java-app:${params.IMAGE_TAG}"
+        DOCKER_IMAGE = "crastle/sample-java-app:${params.IMAGE_TAG}"
     }
     stages {
-        stage('Deploy via kubectl/envsubst (or Ansible)') {
+        // Step 2.3.a: Use Ansible to apply Kubernetes manifests
+        stage('Deploy via Ansible') {
             steps {
-                container('kubectl') {
-                    // Alternatively, we can use the GitOps approach by committing the updated tag to the repo and letting ArgoCD sync.
-                    // The assignment mentions "Use Ansible to apply Kubernetes manifests" for the deployment pipeline, so we can run an ansible playbook here.
-                    // For brevity, we substitute the image tag and apply.
+                container('ansible') {
                     sh """
-                    export DOCKER_IMAGE=${DOCKER_IMAGE}
-                    cat k8s/app-manifests/deployment.yaml | envsubst | kubectl apply -f -
+                    ansible-playbook ansible/playbooks/deploy-app.yml \
+                      -i ansible/inventory/hosts.ini \
+                      -e 'app_image=${DOCKER_IMAGE}' \
+                      -e 'app_replicas=4'
                     """
                 }
             }
         }
-        stage('Wait for Zero-Downtime Rollout') {
+        stage('Verify Zero-Downtime Rollout') {
             steps {
-                container('kubectl') {
-                    sh "kubectl rollout status deployment/sample-java-app --namespace default"
+                container('ansible') {
+                    sh """
+                    ansible kube_master -i ansible/inventory/hosts.ini -m command \
+                      -a 'kubectl rollout status deployment/sample-java-app --namespace default --timeout=300s'
+                    """
                 }
             }
         }

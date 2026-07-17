@@ -1,0 +1,17 @@
+---
+# Ansible role to deploy the Java application to Kubernetes.
+# Called from Jenkinsfile.deploy via ansible-playbook.
+
+- name: Template and apply deployment manifest
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path | default('/etc/kubernetes/admin.conf') }}"
+    state: present
+    template: deployment.yaml.j2
+
+- name: Wait for rollout to complete (zero-downtime)
+  ansible.builtin.command:
+    cmd: >
+      kubectl --kubeconfig={{ kubeconfig_path | default('/etc/kubernetes/admin.conf') }}
+      rollout status deployment/sample-java-app
+      --namespace default --timeout=300s
+  changed_when: false

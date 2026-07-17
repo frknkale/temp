@@ -22,6 +22,8 @@ spec:
               secretKeyRef:
                 name: elasticsearch-credentials
                 key: admin-password
+          - name: xpack.security.enabled
+            value: "true"
 
         esJavaOpts: "-Xms512m -Xmx512m"
         resources:
@@ -32,13 +34,18 @@ spec:
             cpu: 1
             memory: 2Gi
 
+        # Elasticsearch does not support subpath routing natively.
+        # Use a separate hostname instead of observability.local/elasticsearch.
         ingress:
           enabled: true
           className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
           hosts:
-            - host: observability.local
+            - host: elasticsearch.local
               paths:
-                - path: /elasticsearch
+                - path: /
+
         volumeClaimTemplate:
           accessModes: [ "ReadWriteOnce" ]
           storageClassName: "local-path"

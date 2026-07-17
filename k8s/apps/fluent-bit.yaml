@@ -14,15 +14,47 @@ spec:
     helm:
       valuesObject:
         config:
+          # Collect container logs from /var/log/containers
+          inputs: |
+            [INPUT]
+                Name              tail
+                Tag               kube.*
+                Path              /var/log/containers/*.log
+                Parser            cri
+                DB                /var/log/flb_kube.db
+                Mem_Buf_Limit     5MB
+                Skip_Long_Lines   On
+                Refresh_Interval  10
+
+          # Enrich logs with Kubernetes metadata
+          filters: |
+            [FILTER]
+                Name                kubernetes
+                Match               kube.*
+                Kube_URL            https://kubernetes.default.svc:443
+                Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+                Kube_Tag_Prefix     kube.var.log.containers.
+                Merge_Log           On
+                Keep_Log            Off
+                K8S-Logging.Parser  On
+                K8S-Logging.Exclude Off
+
+          # Forward logs to Elasticsearch with authentication
           outputs: |
             [OUTPUT]
                 Name            es
-                Match           *
+                Match           kube.*
                 Host            elasticsearch-master.logging.svc.cluster.local
                 Port            9200
+                HTTP_User       elastic
+                HTTP_Passwd     admin123!
                 Logstash_Format On
+                Logstash_Prefix k8s-logs
                 Replace_Dots    On
-                Retry_Limit     False
+                Retry_Limit     5
+                Suppress_Type_Name On
+                tls             Off
   destination:
     server: https://kubernetes.default.svc
     namespace: logging

@@ -2,17 +2,15 @@
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
-# Initialize go module
-RUN go mod init webhook
-RUN go get k8s.io/api/admission/v1
-RUN go get k8s.io/api/core/v1
-RUN go get k8s.io/apimachinery/pkg/apis/meta/v1
+# Copy Go module files first for dependency caching
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY main.go .
-RUN CGO_ENABLED=0 GOOS=linux go build -o validator .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o validator .
 
-# Stage 2: Create lightweight runtime image
-FROM alpine:3.18
+# Stage 2: Distroless runtime image for minimal attack surface
+FROM gcr.io/distroless/static:nonroot
 WORKDIR /app
 
 COPY --from=builder /app/validator .
@@ -20,4 +18,5 @@ COPY --from=builder /app/validator .
 # Webhooks require TLS, we expose 8443
 EXPOSE 8443
 
+USER nonroot:nonroot
 ENTRYPOINT ["./validator"]

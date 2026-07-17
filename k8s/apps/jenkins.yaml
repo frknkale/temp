@@ -18,8 +18,12 @@ spec:
             existingSecret: jenkins-admin-credentials
             userKey: admin-user
             passwordKey: admin-password
+
+          # Step 1.5.a: Jenkins exclusively on node-2 (Node 3)
           nodeSelector:
             dedicated: jenkins
+
+          # LoadBalancer for external access (Step 1.5.d)
           serviceType: LoadBalancer
 
           resources:
@@ -32,15 +36,91 @@ spec:
 
           javaOpts: "-Xms512m -Xmx1g -XX:+UseG1GC"
 
+          # Install required plugins
+          installPlugins:
+            - kubernetes:latest
+            - workflow-aggregator:latest
+            - git:latest
+            - configuration-as-code:latest
+            - job-dsl:latest
+            - pipeline-stage-view:latest
+            - blueocean:latest
+            - credentials-binding:latest
+            - docker-workflow:latest
+            - ansible:latest
+
+          numExecutors: 0
+
+          # Step 1.5.b: Configuration as Code (JCasC)
           JCasC:
             defaultConfig: true
             configScripts:
               welcome-message: |
                 jenkins:
-                  systemMessage: "Welcome to our GitOps managed Jenkins."
+                  systemMessage: "Welcome to our GitOps managed Jenkins. Configured via JCasC."
+              credentials: |
+                credentials:
+                  system:
+                    domainCredentials:
+                    - credentials:
+                      - usernamePassword:
+                          scope: GLOBAL
+                          id: "dockerhub-credentials"
+                          username: "crastle"
+                          password: "${DOCKER_PASSWORD}"
+                          description: "Docker Hub credentials"
+              pipeline-jobs: |
+                jobs:
+                  - script: >
+                      pipelineJob('build-pipeline') {
+                        definition {
+                          cpsScm {
+                            scm {
+                              git {
+                                remote {
+                                  url('https://github.com/frknkale/temp.git')
+                                }
+                                branch('*/main')
+                              }
+                            }
+                            scriptPath('Jenkinsfile.build')
+                          }
+                        }
+                      }
+                  - script: >
+                      pipelineJob('deploy-pipeline') {
+                        parameters {
+                          stringParam('IMAGE_TAG', 'latest', 'Docker image tag to deploy')
+                        }
+                        definition {
+                          cpsScm {
+                            scm {
+                              git {
+                                remote {
+                                  url('https://github.com/frknkale/temp.git')
+                                }
+                                branch('*/main')
+                              }
+                            }
+                            scriptPath('Jenkinsfile.deploy')
+                          }
+                        }
+                      }
+              kubernetes-cloud: |
+                jenkins:
+                  clouds:
+                  - kubernetes:
+                      name: "kubernetes"
+                      serverUrl: "https://kubernetes.default.svc"
+                      namespace: "jenkins"
+                      jenkinsUrl: "http://jenkins.jenkins.svc.cluster.local:8080"
+                      jenkinsTunnel: "jenkins-agent.jenkins.svc.cluster.local:50000"
+
+        # Step 1.5.c: Persistent configuration
         persistence:
           enabled: true
           size: 8Gi
+
   destination:
     server: https://kubernetes.default.svc
     namespace: jenkins

@@ -16,10 +16,11 @@
 
 - name: Wait for MetalLB controller to be ready
   ansible.builtin.command: >
-    kubectl wait --namespace metallb-system 
-    --for=condition=ready pod 
-    --selector=app.kubernetes.io/component=controller 
+    kubectl wait --namespace metallb-system
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/component=controller
     --timeout=180s
+  changed_when: false
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
 

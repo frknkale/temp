@@ -1,0 +1,21 @@
+# Build artifacts
+target/
+*.jar
+*.class
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
